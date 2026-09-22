@@ -1,0 +1,181 @@
+{
+  "kind": "rollout_fabric.change_plan",
+  "schema_version": 1,
+  "change_id": "CHG-2026-0417-FABRIC",
+  "approved_by": "change-planner",
+  "approved_at": "2026-01-01T00:00:00Z",
+  "source_digest": "3b1f4c2a9e8d7065b4a3928176f5e4d3c2b1a09f8e7d6c5b4a3928176f5e4d3c",
+  "summary": "Roll a fabric-wide configuration change across two waves with a canary.",
+  "stages": [
+    {
+      "name": "canary",
+      "ordinal": 0,
+      "selector": {
+        "op": "and",
+        "children": [
+          {
+            "op": "by_kind",
+            "kinds": [
+              "switch"
+            ]
+          },
+          {
+            "op": "by_site",
+            "sites": [
+              "site-a"
+            ]
+          }
+        ]
+      },
+      "policy": {
+        "max_concurrency": 2,
+        "min_healthy_fraction": "1/1",
+        "failure_budget_targets": 0,
+        "failure_budget_fraction": "0/1",
+        "canary_size": 1,
+        "canary_requires_health_gate": true,
+        "entry_gate": "automatic",
+        "advance_gate": "automatic",
+        "attempt_deadline_ms": 30000,
+        "max_attempts_per_target": 2,
+        "evidence_max_age_ms": 60000,
+        "pause_in_flight": "let_finish",
+        "rollback_supported": true,
+        "compensation_actions": [
+          "undo-config"
+        ],
+        "health_gate": {
+          "enabled": true,
+          "max_age_ms": 30000,
+          "min_consecutive_healthy": 1,
+          "min_healthy_fraction": "1/1",
+          "failure_budget_targets": 0,
+          "failure_budget_fraction": "0/1"
+        },
+        "evidence_gate": {
+          "mode": "automatic",
+          "soak_ms": 200,
+          "max_age_ms": 60000,
+          "min_passing_samples": 1,
+          "min_passing_fraction": "0/1",
+          "require_full_coverage": false
+        },
+        "blast_radius": {
+          "max_targets_changing_global": 2,
+          "max_targets_changing_per_stage": 2,
+          "max_targets_changing_per_failure_domain": 1,
+          "max_targets_changing_per_rack": 1,
+          "max_targets_changing_per_pod": 1,
+          "max_targets_changing_per_site": 2,
+          "max_failure_domains_changing": 2
+        }
+      },
+      "evidence_rule": {
+        "success_authority": "execution_adapter_attested",
+        "failure_authority": "execution_adapter_attested",
+        "require_verification": false,
+        "require_health_after_success": false
+      },
+      "actions": [
+        {
+          "name": "apply-config",
+          "kind": "apply_configuration",
+          "artifact_digest": "aa11bb22cc33dd44ee55ff6600778899aabbccddeeff00112233445566778899",
+          "rollback": "supported"
+        },
+        {
+          "name": "undo-config",
+          "kind": "compensate",
+          "artifact_digest": "99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa",
+          "rollback": "supported"
+        }
+      ]
+    },
+    {
+      "name": "wave-two",
+      "ordinal": 1,
+      "predecessors": [
+        "canary"
+      ],
+      "selector": {
+        "op": "and",
+        "children": [
+          {
+            "op": "by_kind",
+            "kinds": [
+              "switch"
+            ]
+          },
+          {
+            "op": "by_site",
+            "sites": [
+              "site-b"
+            ]
+          }
+        ]
+      },
+      "policy": {
+        "max_concurrency": 2,
+        "min_healthy_fraction": "1/1",
+        "failure_budget_targets": 0,
+        "failure_budget_fraction": "0/1",
+        "canary_size": 0,
+        "entry_gate": "manual",
+        "advance_gate": "automatic",
+        "attempt_deadline_ms": 30000,
+        "max_attempts_per_target": 2,
+        "evidence_max_age_ms": 60000,
+        "pause_in_flight": "let_finish",
+        "rollback_supported": true,
+        "compensation_actions": [
+          "undo-config"
+        ],
+        "health_gate": {
+          "enabled": true,
+          "max_age_ms": 30000,
+          "min_consecutive_healthy": 1,
+          "min_healthy_fraction": "1/1",
+          "failure_budget_targets": 0,
+          "failure_budget_fraction": "0/1"
+        },
+        "evidence_gate": {
+          "mode": "automatic",
+          "soak_ms": 200,
+          "max_age_ms": 60000,
+          "min_passing_samples": 1,
+          "min_passing_fraction": "0/1",
+          "require_full_coverage": false
+        },
+        "blast_radius": {
+          "max_targets_changing_global": 4,
+          "max_targets_changing_per_stage": 4,
+          "max_targets_changing_per_failure_domain": 1,
+          "max_targets_changing_per_rack": 1,
+          "max_targets_changing_per_pod": 2,
+          "max_targets_changing_per_site": 4,
+          "max_failure_domains_changing": 3
+        }
+      },
+      "evidence_rule": {
+        "success_authority": "execution_adapter_attested",
+        "failure_authority": "execution_adapter_attested",
+        "require_verification": false,
+        "require_health_after_success": false
+      },
+      "actions": [
+        {
+          "name": "apply-config",
+          "kind": "apply_configuration",
+          "artifact_digest": "aa11bb22cc33dd44ee55ff6600778899aabbccddeeff00112233445566778899",
+          "rollback": "supported"
+        },
+        {
+          "name": "undo-config",
+          "kind": "compensate",
+          "artifact_digest": "99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa",
+          "rollback": "supported"
+        }
+      ]
+    }
+  ]
+}

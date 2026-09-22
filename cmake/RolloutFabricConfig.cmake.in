@@ -1,0 +1,14 @@
+@PACKAGE_INIT@
+
+# Rollout Fabric CMake package.
+#
+# Copyright 2026 Summon Software Labs.
+# Licensed under the Apache License, Version 2.0.
+
+include(CMakeFindDependencyMacro)
+
+set(RolloutFabric_VERSION "@PROJECT_VERSION@")
+
+include("${CMAKE_CURRENT_LIST_DIR}/RolloutFabricTargets.cmake")
+
+check_required_components(RolloutFabric)

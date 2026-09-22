@@ -1,0 +1,102 @@
+{
+  "kind": "rollout_fabric.inventory",
+  "schema_version": 1,
+  "targets": [
+    {
+      "name": "leaf-00",
+      "kind": "switch",
+      "site": "site-a",
+      "pod": "pod-0",
+      "rack": "rack-0",
+      "failure_domain": "fd-0",
+      "labels": {
+        "tier": "spine",
+        "role": "fabric"
+      }
+    },
+    {
+      "name": "leaf-01",
+      "kind": "switch",
+      "site": "site-a",
+      "pod": "pod-1",
+      "rack": "rack-1",
+      "failure_domain": "fd-1",
+      "labels": {
+        "tier": "spine",
+        "role": "fabric"
+      }
+    },
+    {
+      "name": "leaf-02",
+      "kind": "switch",
+      "site": "site-a",
+      "pod": "pod-2",
+      "rack": "rack-2",
+      "failure_domain": "fd-2",
+      "labels": {
+        "tier": "leaf",
+        "role": "fabric"
+      }
+    },
+    {
+      "name": "leaf-03",
+      "kind": "switch",
+      "site": "site-a",
+      "pod": "pod-3",
+      "rack": "rack-3",
+      "failure_domain": "fd-3",
+      "labels": {
+        "tier": "leaf",
+        "role": "fabric"
+      }
+    },
+    {
+      "name": "leaf-04",
+      "kind": "switch",
+      "site": "site-b",
+      "pod": "pod-0",
+      "rack": "rack-4",
+      "failure_domain": "fd-0",
+      "labels": {
+        "tier": "leaf",
+        "role": "fabric"
+      }
+    },
+    {
+      "name": "leaf-05",
+      "kind": "switch",
+      "site": "site-b",
+      "pod": "pod-1",
+      "rack": "rack-5",
+      "failure_domain": "fd-1",
+      "labels": {
+        "tier": "leaf",
+        "role": "fabric"
+      }
+    },
+    {
+      "name": "leaf-06",
+      "kind": "switch",
+      "site": "site-b",
+      "pod": "pod-2",
+      "rack": "rack-6",
+      "failure_domain": "fd-2",
+      "labels": {
+        "tier": "leaf",
+        "role": "fabric"
+      }
+    },
+    {
+      "name": "leaf-07",
+      "kind": "switch",
+      "site": "site-b",
+      "pod": "pod-3",
+      "rack": "rack-7",
+      "failure_domain": "fd-3",
+      "labels": {
+        "tier": "leaf",
+        "role": "fabric"
+      }
+    }
+  ]
+}
