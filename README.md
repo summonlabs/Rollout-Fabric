@@ -1,6 +1,6 @@
 # Rollout Fabric
 
-Vendor-neutral rollout orchestration runtime for the Summon Software Labs Fabric OS.
+Vendor-neutral rollout orchestration runtime for network fabrics.
 
 Rollout Fabric owns **execution orchestration** across cohorts and stages. It consumes an
 approved Change Planner plan plus deployable artifacts/actions, and it coordinates *when*
