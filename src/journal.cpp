@@ -204,12 +204,37 @@ class FileHandle {
     if (!widen(from, wide_from) || !widen(to, wide_to)) {
       return make_status(StatusCode::kInvalidArgument, "journal path is not valid UTF-8");
     }
-    if (::MoveFileExW(wide_from.c_str(), wide_to.c_str(),
-                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) == 0) {
-      return make_status(StatusCode::kIoError, "journal compaction replace failed: Windows error " +
-                                                   std::to_string(::GetLastError()));
+    // While a reader has the journal open (an inspection, an antivirus or
+    // indexing scan) the replace fails until the reader closes the file, so it
+    // is retried for a bounded time (about 2 s). A directory in the way is not
+    // transient and fails at once.
+    for (int attempt = 0;; ++attempt) {
+      if (::MoveFileExW(wide_from.c_str(), wide_to.c_str(),
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0) {
+        return Status::success();
+      }
+      const DWORD error = ::GetLastError();
+      const DWORD attributes = ::GetFileAttributesW(wide_to.c_str());
+      const bool directory =
+          attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+      const bool transient = (error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION ||
+                              error == ERROR_LOCK_VIOLATION) &&
+                             !directory;
+      if (!transient || attempt >= 100) {
+        return make_status(StatusCode::kIoError,
+                           "journal compaction replace failed: Windows error " +
+                               std::to_string(error));
+      }
+      ::Sleep(20);
     }
-    return Status::success();
+  }
+
+  // Removes a file, ignoring failure: discards a compaction's temporary.
+  static void remove_file(const std::string& path) {
+    std::wstring wide;
+    if (widen(path, wide)) {
+      (void)::DeleteFileW(wide.c_str());
+    }
   }
 
  private:
@@ -315,6 +340,9 @@ class FileHandle {
     }
     return Status::success();
   }
+
+  // Removes a file, ignoring failure: discards a compaction's temporary.
+  static void remove_file(const std::string& path) { (void)::unlink(path.c_str()); }
 
  private:
   int descriptor_ = -1;
@@ -927,11 +955,13 @@ Status JournalWriter::rewrite(const std::vector<JournalRecord>& records) {
     return Status::success();
   };
 
+  // A compaction that fails part way discards its temporary: installing it
+  // would replace the live journal with a partial copy.
   for (const JournalRecord& record : records) {
     status = write_record(record.type, record.payload);
     if (!status.ok()) {
       temp.close();
-      FileHandle::replace_file(temp_path, impl_->path);
+      FileHandle::remove_file(temp_path);
       return status;
     }
   }
@@ -940,13 +970,13 @@ Status JournalWriter::rewrite(const std::vector<JournalRecord>& records) {
   status = write_record(JournalRecordType::kCompactionMarker, {});
   if (!status.ok()) {
     temp.close();
-    FileHandle::replace_file(temp_path, impl_->path);
+    FileHandle::remove_file(temp_path);
     return status;
   }
   status = temp.sync();
   if (!status.ok()) {
     temp.close();
-    FileHandle::replace_file(temp_path, impl_->path);
+    FileHandle::remove_file(temp_path);
     return status;
   }
   temp.close();

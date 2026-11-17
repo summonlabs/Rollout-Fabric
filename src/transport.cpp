@@ -393,10 +393,13 @@ Result<Socket> Socket::listen_loopback(std::uint16_t port) {
   Socket listener;
   listener.adopt(static_cast<std::uintptr_t>(handle));
 
-  const BOOL reuse = TRUE;
-  if (::setsockopt(handle, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse),
-                   static_cast<int>(sizeof(reuse))) == SOCKET_ERROR) {
-    return winsock_unavailable("setsockopt(SO_REUSEADDR)");
+  // SO_REUSEADDR on Windows lets a second socket bind a port that is still
+  // listening; exclusive use makes that second bind fail instead.
+  const BOOL exclusive = TRUE;
+  if (::setsockopt(handle, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+                   reinterpret_cast<const char*>(&exclusive),
+                   static_cast<int>(sizeof(exclusive))) == SOCKET_ERROR) {
+    return winsock_unavailable("setsockopt(SO_EXCLUSIVEADDRUSE)");
   }
 
   sockaddr_in address{};

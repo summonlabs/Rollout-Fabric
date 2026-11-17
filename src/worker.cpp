@@ -41,6 +41,7 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <iterator>
 #include <vector>
 
 #if defined(_WIN32)
@@ -581,7 +582,13 @@ struct Worker::Impl {
   std::map<AttemptId, EffectState> effects{};
   std::deque<AttemptId> effect_order{};
   std::map<Digest256, AttemptId> key_index{};
-  std::vector<std::jthread> threads{};
+  // Each effect thread is kept with a flag it sets as it finishes, so a
+  // finished thread can be joined and dropped while the worker keeps serving.
+  struct EffectThread {
+    std::shared_ptr<std::atomic<bool>> finished;
+    std::jthread thread;
+  };
+  std::vector<EffectThread> threads{};
   CompletionQueue completions{};
   FrameChannel channel{};
   std::uint64_t out_sequence = 0;
@@ -841,7 +848,18 @@ Status Worker::Impl::handle_dispatch(const Frame& frame) {
     plan.emit_progress = scenario.work_duration >= Duration::from_millis(kProgressThresholdMillis);
     plan.seed = mix_seed(request.fence.attempt);
     const auto stop = stored.stop;
-    threads.emplace_back([stop, this, plan]() { run_effect(stop, completions, plan); });
+    // A finished effect thread was kept until shutdown, so a long-running
+    // worker held one thread for every attempt it had ever served. Finished
+    // threads are joined and dropped before another one starts.
+    std::erase_if(threads, [](const EffectThread& entry) {
+      return entry.finished->load(std::memory_order_acquire);
+    });
+    auto finished = std::make_shared<std::atomic<bool>>(false);
+    std::jthread thread([stop, finished, this, plan]() {
+      run_effect(stop, completions, plan);
+      finished->store(true, std::memory_order_release);
+    });
+    threads.push_back(EffectThread{std::move(finished), std::move(thread)});
   }
   return Status::success();
 }
@@ -1151,6 +1169,12 @@ Status Worker::run() {
                                    ? state.options.connect_timeout.nanos()
                                    : 0);
   bool acknowledged = false;
+  // The controller may queue work right behind its acknowledgement, and both
+  // can arrive in one read. Frames that follow the acknowledgement were
+  // rejected as if they had come before it, so the worker ended its run with
+  // "sent ... before acknowledging the worker's hello". They are kept, in
+  // order, for the serving loop below.
+  std::vector<Frame> after_ack;
   while (!acknowledged) {
     const auto elapsed = SteadyClock::now() - handshake_started;
     if (elapsed >= handshake_budget) {
@@ -1165,7 +1189,11 @@ Status Worker::run() {
       return failure;
     }
     std::vector<Frame> frames = state.channel.take_inbound();
-    for (const Frame& frame : frames) {
+    for (Frame& frame : frames) {
+      if (acknowledged) {
+        after_ack.push_back(std::move(frame));
+        continue;
+      }
       if (frame.type == MessageType::kHelloAck) {
         auto ack = decode_hello_ack(frame.body, state.options.limits);
         if (!ack.ok()) {
@@ -1242,6 +1270,11 @@ Status Worker::run() {
     }
 
     std::vector<Frame> frames = state.channel.take_inbound();
+    if (!after_ack.empty()) {
+      frames.insert(frames.begin(), std::make_move_iterator(after_ack.begin()),
+                    std::make_move_iterator(after_ack.end()));
+      after_ack.clear();
+    }
     for (const Frame& frame : frames) {
       Status handled = Status::success();
       switch (frame.type) {

@@ -1049,4 +1049,16 @@ RF_TEST(transport_frame_channel_flush_out_deadline) {
   RF_CHECK(right.failure().ok());
 }
 
+RF_TEST(a_second_listener_cannot_take_a_listening_port) {
+  RF_REQUIRE(ensure_socket_runtime().ok());
+  auto first = Socket::listen_loopback(0);
+  RF_REQUIRE(first.ok());
+  const std::uint16_t port = first.value().bound_port();
+  RF_REQUIRE(port != 0);
+  // With SO_REUSEADDR, Windows lets this second bind take the port the first
+  // listener is still listening on.
+  auto second = Socket::listen_loopback(port);
+  RF_CHECK(!second.ok());
+}
+
 RF_TEST_MAIN()
